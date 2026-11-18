@@ -1,0 +1,4 @@
+# Build output is byte-compared by tests/run.ts, so it must survive checkout
+# unchanged: core.autocrlf would otherwise rewrite dist/*.js to CRLF and make a
+# fresh build differ.
+dist/** -text
