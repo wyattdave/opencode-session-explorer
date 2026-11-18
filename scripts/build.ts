@@ -21,8 +21,15 @@
  * ids that only resolve inside the host process.
  *
  * Output is one file per input (no bundling) so the relative imports between
- * `tui.tsx`, `index.ts`, `rpc.ts`, `directory.ts`, `options.ts` and
- * `sessions.ts` stay relative and both entries keep sharing a single `rpc.js`.
+ * `tui.tsx`, `index.ts`, `rpc.ts`, `directory.ts`, `options.ts`, `sessions.ts`
+ * and `explorer.ts` stay relative and both entries keep sharing a single
+ * `rpc.js`.
+ *
+ * The Desktop GUI (`src/gui.tsx` and `src/gui/**`) is deliberately excluded:
+ * it is compiled by Vite with the official `@opencode/plugin/gui/vite` preset
+ * into a single CommonJS `dist/gui-experimental.cjs`, which this script
+ * preserves. Only `.js` outputs are cleaned, so the two builds can run in
+ * either order without deleting each other.
  */
 import { transformAsync } from "@babel/core"
 import presetTypeScript from "@babel/preset-typescript"
@@ -38,25 +45,47 @@ export const defaultOutDir = join(projectRoot, "dist")
 /** The entry OpenCode is told to use from `package.json#exports`. */
 export const TUI_ENTRY = "tui.js"
 
+/** The Vite-built Desktop GUI bundle; never produced or cleaned by this script. */
+export const GUI_BUNDLE = "gui-experimental.cjs"
+
 const SCRIPT = /\.[cm]?tsx?$/
 const JSX = /\.[cm]?[jt]sx$/
 /** `.d.ts` and friends match {@link SCRIPT} but have nothing to emit. */
 const DECLARATION = /\.d\.[cm]?ts$/
+/** The Desktop GUI is bundled by Vite; its sources are not part of this build. */
+const GUI_SOURCES = /^gui(\/|\.tsx$)/
 
-async function sourceFiles(directory: string): Promise<string[]> {
+async function sourceFiles(directory: string, prefix = ""): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true })
   const files: string[] = []
   for (const entry of entries) {
     const path = join(directory, entry.name)
-    if (entry.isDirectory()) files.push(...(await sourceFiles(path)))
-    else if (SCRIPT.test(entry.name) && !DECLARATION.test(entry.name)) files.push(path)
+    if (entry.isDirectory()) files.push(...(await sourceFiles(path, `${prefix}${entry.name}/`)))
+    else if (SCRIPT.test(entry.name) && !DECLARATION.test(entry.name) && !GUI_SOURCES.test(`${prefix}${entry.name}`)) {
+      files.push(path)
+    }
   }
   return files.sort()
 }
 
+/** Remove this script's `.js` outputs, preserving the Vite-built GUI bundle. */
+async function removeCompiled(outDir: string): Promise<void> {
+  let entries
+  try {
+    entries = await readdir(outDir, { withFileTypes: true })
+  } catch {
+    return
+  }
+  for (const entry of entries) {
+    const path = join(outDir, entry.name)
+    if (entry.isDirectory()) await removeCompiled(path)
+    else if (entry.name.endsWith(".js")) await rm(path, { force: true })
+  }
+}
+
 /** Compile every `src/**` script into `outDir`; returns the emitted paths, relative to `outDir`. */
 export async function build(outDir: string = defaultOutDir): Promise<string[]> {
-  await rm(outDir, { recursive: true, force: true })
+  await removeCompiled(outDir)
   const emitted: string[] = []
   for (const file of await sourceFiles(sourceDir)) {
     const presets: unknown[] = []

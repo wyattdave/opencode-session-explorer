@@ -18,7 +18,7 @@ export const MAX_DIRECTORIES = 1000
  * to be loaded at.
  */
 export const SessionHistory = Rpc.define({
-  id: "session-history",
+  id: "session-explorer",
   methods: {
     check: {
       input: {

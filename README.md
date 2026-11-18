@@ -1,49 +1,180 @@
-# opencode-session-history
+# Session Explorer
 
-A CLI plugin for [OpenCode V2](https://opencode.ai/v2/docs/) that adds a **Session History** panel to the sidebar. Click a previous session to resume it — in the same tab if it's already open, in a new tab otherwise.
+A session launcher for **OpenCode V2** — a fork of
+[`ypxcs/opencode-session-history`](https://github.com/ypxcs/opencode-session-history)
+that keeps the original terminal (TUI) history panel and adds a global Desktop
+entry point: a titlebar button and a command that open a searchable dialog over
+**every project and every archived session**, even from the home screen with no
+session open.
 
-## Features
+Package: `opencode-session-explorer-desktop` · plugin id: `session-explorer`.
 
-- Sidebar panel that lists sessions across every project, newest-first (or
-  scoped to the current project with `showAllProjects: false`).
-- Compact by default: three session rows are visible and the rest scroll
-  (`maxVisibleSessions`). Long titles end in `...` instead of wrapping
-  (`truncateSessionTitles`), so each row keeps a predictable height. Arrow
-  navigation keeps the highlighted row in view.
-- Also shown on the home screen (before any session is open) as a right-hand
-  panel, width permitting — the CLI's own sidebar only exists inside a session.
-- Search filter by title, id, project, or directory. Click the field to focus
-  it (OpenCode does not focus plugin content automatically); `escape` clears
-  the query, then blurs back to the prompt.
-- Click-to-resume:
-  - If the session is already open in a tab → focus that tab.
-  - Otherwise → open a new tab and focus it.
-  - When session tabs are disabled → falls back to `router.navigate({ type: "session" })`.
-- Sessions whose working directory is gone on the server are dimmed and prefixed
-  with a red `✗`. Clicking one warns first (a short, dismissible toast that never
-  navigates); clicking it again opens it anyway. This is distinct from a
-  *deleted* session (the record itself), which never appears in the list.
-- Subscribes to session lifecycle events (`created`, `renamed`, `metadata` and
-  `usage` updates, `deleted`) for live refresh.
+## What this fork adds
+
+- **Global Desktop launcher.** A persistent titlebar button (`Sessions`) and the
+  command **Session Explorer: Open** (`Ctrl+Shift+H` on Windows/Linux,
+  `Cmd+Shift+H` on macOS). Both work on a cold-start home screen, with a draft,
+  or with sessions open, and both call the same opener (no stacked dialogs, no
+  DOM injection).
+- **Native modal.** Built from `ctx.dialogs.open` + `ctx.ui`, large and
+  responsive, search field focused on open, keyboard navigation, Enter to open,
+  Escape to close, labelled listbox semantics for screen readers.
+- **Complete metadata index.** Every root session on every connected server,
+  archived and unarchived, fetched with cursor pagination (no fixed history cap)
+  and searched client-side across title, project, directory, subpath, session ID
+  and server name. No transcripts are read and no sessions are created just to
+  enumerate them.
+- **Filters and sorting.** Project dropdown with counts (including projects that
+  only have archived sessions), All / Unarchived / Archived, sort by last
+  updated / created / title with stable tie-breakers, and optional collapsible
+  grouping by project.
+- **Archive workflow.** Archive and restore from the row menu through the
+  supported SDK mutation, verified by reading the session back. Running sessions
+  cannot be archived. There is no delete action.
+- **Safe navigation.** A row opens the session on its original server in a new
+  focused tab, or focuses its existing tab. Archived sessions open directly on
+  hosts that support it; otherwise the menu offers **Restore and open** (never a
+  silent unarchive). A session whose working directory is confirmed missing asks
+  before opening; an unknown directory state is never reported as missing.
+
+The TUI and server entries are the upstream ones: same panel, same options and
+defaults. `limit` only caps the TUI panel and never the Desktop list.
 
 ## Installation
 
-Requires **OpenCode V2**.
+Requires **OpenCode V2**. Desktop support was tested with OpenCode Desktop
+**2.3.2** on Windows 11 (see [Version support](#version-support)).
 
-### From npm
+The package is **not published to npm** yet. Install it from a checkout or from
+the packed tarball; `dist/` is committed and shipped, so consumers never run a
+build step.
 
 ```sh
-opencode plugin add opencode-session-history
+# Somewhere outside the source tree, e.g. the plugins folder:
+mkdir -p ~/.config/opencode/plugins/opencode-session-explorer
+cd ~/.config/opencode/plugins/opencode-session-explorer
+npm install /path/to/opencode-session-explorer-desktop-0.2.0.tgz
 ```
 
-Or add it to `opencode.jsonc` (project or `~/.config/opencode/opencode.jsonc`):
+Then add the installed package to `~/.config/opencode/opencode.jsonc`, merging it
+with the entries already there:
+
+```jsonc
+{
+  "plugins": [
+    "C:/Users/you/.config/opencode/plugins/opencode-session-explorer/node_modules/opencode-session-explorer-desktop"
+  ]
+}
+```
+
+Restart OpenCode Desktop. `opencode plugin list` should show it:
+
+```text
+ID                VERSION  SOURCE
+session-explorer  local    C:/Users/you/.config/opencode/plugins/opencode-session-explorer/node_modules/opencode-session-explorer-desktop
+```
+
+`opencode api plugin.list` additionally reports `state: active` and
+`features: { server: true, tui: true, gui: true }`.
+
+A checkout also works during development:
+
+```jsonc
+{ "plugins": ["C:/GitHub/opencode-archive-manager"] }
+```
+
+> Git URL installs (`github:...`) fail on some V2 builds before the download
+> finishes; prefer a local path or a tarball. Do not install the upstream
+> package and this fork side by side — both register a history panel.
+
+To uninstall, remove the `plugins` entry (or the folder) and restart. Removing
+the plugin only removes its button, command and panel; it does not touch
+sessions.
+
+## Usage
+
+### Opening the explorer
+
+- Click the **Sessions** button in the titlebar (bottom-left, beside the status
+  area). It is present on the home screen too.
+- Press `Ctrl+Shift+H` (`Cmd+Shift+H` on macOS), or run **Session Explorer:
+  Open** from the command palette / command menu.
+
+The dialog opens with the search field focused. Escape closes it and returns
+focus to where it was.
+
+### Keyboard
+
+| Key | Action |
+| --- | --- |
+| `↓` from the search field | Move into the results |
+| `↑` / `↓` | Move between results |
+| `Home` / `End` | First / last result |
+| `Enter` | Open the highlighted session |
+| `Esc` | Close the menu, then the dialog |
+
+### Searching and filtering
+
+- The search box matches title, project name, project directory, subpath,
+  session ID and server name, case-insensitively. Typing is debounced, and the
+  search runs over the complete in-memory index, so old archived sessions are
+  found too.
+- **Project** lists every project, with the number of matching sessions. Projects
+  that only contain archived sessions stay in the list.
+- **Session state** switches All / Unarchived / Archived. Archived results never
+  depend on the unarchived page being loaded.
+- **Sort by** offers Last updated (default), Created and Title. Ties break by
+  session ID, so the order is stable.
+- **Group by project** adds collapsible section headers with total counts; turn
+  it off for the flat list.
+- **Reset filters** returns project, state, sort, grouping and the search text to
+  their defaults.
+- Results load 200 rows at a time with **Show more**; there is no overall cap.
+
+### Rows
+
+Each row shows the title (`Untitled session` when blank), project, archived and
+running badges, a directory-missing badge, the relative update time, and the
+full directory in a tooltip. The row's `Open` action and the menu (`Archive`,
+`Restore and open`, `Restore`, `Copy session ID`) never open the row by
+accident.
+
+- **Open** focuses the session's existing tab, or opens a new focused tab.
+- **Archive** is disabled while the session is running.
+- **Restore** puts an archived session back in the unarchived list.
+- A confirmed-missing working directory triggers an **Open anyway** confirmation
+  before the tab opens.
+
+### Preferences
+
+The project selection, archive filter, sort and grouping are stored in the
+plugin's global store and restored on the next launch. A saved project that no
+longer exists falls back to All projects. The search text is never stored, and
+no transcripts, credentials or metadata caches are written to disk.
+
+## Terminal (TUI) panel
+
+The upstream sidebar panel is unchanged: it lists sessions newest-first, opens
+one in the existing tab or a new tab, warns before opening a session whose
+directory is gone, and refreshes from session lifecycle events. It is also shown
+on the CLI home screen when the terminal is wide enough.
+
+### Options
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `limit` | `number` | `100` | Maximum number of sessions included in the panel list. Does not affect the Desktop explorer. |
+| `maxVisibleSessions` | `number` | `3` | Sessions visible before the list scrolls. |
+| `truncateSessionTitles` | `boolean` | `true` | Keep titles on one line with `...`. Set to `false` to word-wrap them. |
+| `showMetrics` | `boolean` | `true` | Show the "Xm ago · $Y.YY" line under the title. |
+| `showAllProjects` | `boolean` | `true` | When true, list sessions from every project. When false, only the current project's sessions are shown. |
 
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
-      "package": "opencode-session-history",
+      "package": "C:/GitHub/opencode-archive-manager",
       "options": {
         "limit": 100,
         "maxVisibleSessions": 3,
@@ -56,176 +187,106 @@ Or add it to `opencode.jsonc` (project or `~/.config/opencode/opencode.jsonc`):
 }
 ```
 
-The CLI loads the sidebar panel automatically from the package's `./tui` export — you do not need to add it to `cli.json`.
+> OpenCode passes a plugin's config `options` to its *server* half but not to its
+> *TUI* half, which receives `{}` for a plugin declared in `opencode.json(c)`.
+> The TUI reads the values back over the plugin's own `settings` RPC, so the
+> table above still works from `opencode.json(c)`. Wrong-typed values are
+> ignored rather than coerced.
 
-### From GitHub
+For "open in a new tab" in the TUI, enable session tabs in `cli.json`:
 
 ```jsonc
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugins": ["github:ypxcs/opencode-session-history"]
-}
+{ "tabs": { "mode": "on" } }
 ```
 
-> **This does not work on OpenCode 2.0.32.** It fails before the plugin is
-> downloaded, with
-> `NpmInstallFailedError (cause: Error: git dep preparation failed)`.
->
-> npm installs a Git package in two steps: download the repo, then *prepare* it
-> by running the npm CLI as a child process (`process.execPath` +
-> `npm-cli.js`). OpenCode ships its own npm, so that child process is the
-> OpenCode binary itself — it receives npm's arguments, prints its own help
-> text, and exits non-zero. npm reports "git dep preparation failed" and nothing
-> is installed. Revisions whose prepared tarball is already in
-> `~/.npm/_cacache` still install because the preparation step is skipped;
-> anything new (including `#main` after a push) does not.
->
-> Registry (npm) installs never run that path — they just download a tarball —
-> which is why the npm install above is the supported route. If you need a
-> specific commit, load it by path from a checkout instead
-> (`"package": "/path/to/opencode-session-history/src"`, see below).
+## Version support
 
-### As a project-local plugin
+| Component | Version |
+| --- | --- |
+| Minimum and maximum tested host | OpenCode Desktop **2.3.2** (Windows 11, 2304×1536) |
+| `@opencode/plugin` (host API used by the GUI entry) | 2.3.2 |
+| `@opencode/client` | 2.3.2 |
+| TUI peers | `@opentui/core` 0.9.3, `@opentui/solid` 0.9.3, `solid-js` 1.9.17 |
 
-1. Copy this directory to `.opencode/plugins/session-history/` in your project (V2 discovers `index.ts` + `tui.tsx` package directories there automatically).
-2. Or reference it explicitly:
+The Desktop plugin API is experimental: the GUI entry is published as
+`./gui-experimental` and the host loads it as a prebuilt CJS bundle. Other host
+versions have not been tested. On a host that marks the server incompatible, the
+dialog lists it as incompatible and keeps working for compatible servers; it
+never shows a failure as an empty archive.
 
-   ```jsonc
-   {
-     "plugins": [
-       {
-         "package": "./src",
-         "options": {
-           "limit": 100,
-           "maxVisibleSessions": 3,
-           "truncateSessionTitles": true,
-           "showMetrics": true,
-           "showAllProjects": true
-         }
-       }
-     ]
-   }
-   ```
+## Troubleshooting
 
-### Options
-
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `limit` | `number` | `100` | Maximum number of sessions included in the list. |
-| `maxVisibleSessions` | `number` | `3` | Sessions visible before the list scrolls. |
-| `truncateSessionTitles` | `boolean` | `true` | Keep titles on one line with `...`. Set to `false` to word-wrap them. |
-| `showMetrics` | `boolean` | `true` | Show the "Xm ago · $Y.YY" line under the title. |
-| `showAllProjects` | `boolean` | `true` | When true, list sessions from every project. When false, only the current project's sessions are shown. |
-
-> With `truncateSessionTitles: true`, `maxVisibleSessions` maps to a fixed row
-> height. With wrapping enabled, a long title can make a row taller and reduce
-> the number of fully visible sessions.
-
-> **How options are delivered.** OpenCode passes a plugin's config `options` to
-> its *server* half but not to its *TUI* half, which receives `{}` for a plugin
-> declared in `opencode.json(c)`. The TUI reads the values back over the
-> plugin's own `settings` RPC, so the table above works from `opencode.json(c)`.
-> Wrong-typed values are ignored rather than coerced. If the options are also
-> declared in `cli.json` under `plugins`, those take precedence in the TUI.
-
-## Requirements
-
-- OpenCode **V2** (`@opencode/plugin` v2.x).
-- For "open in new tab" behavior, enable session tabs:
-  ```jsonc
-  // ~/.config/opencode/cli.json
-  { "tabs": { "mode": "on" } }
-  ```
-  When tabs are `auto` / `off`, the click handler uses `router.navigate` instead, which replaces the current session view.
-
-## Packaging: why the TUI entry is precompiled
-
-OpenCode compiles plugin JSX through OpenTUI's own Bun plugin, but that plugin
-only touches files whose path does **not** contain `node_modules`:
-
-```js
-/^(?!.*[/\\]node_modules[/\\]).*\.[cm]?[jt]sx?(?:[?#].*)?$/
-```
-
-Every package install — npm or Git — lands the plugin in `node_modules`, so a
-raw `.tsx` TUI entry never gets that transform. Bun's own JSX transform then
-compiles it against `@opentui/solid/jsx-runtime`, which is a *static* runtime:
-props are plain values, not getters. Each signal read happens once, at mount, so
-the panel lists only the session cached at mount (`1 session`), never refreshes,
-and the slot it was appended to is laid out from the same stale snapshot. The
-identical source loaded from a checkout path sits outside `node_modules`, gets
-the real transform, and works — which is why the bug followed the install tree.
-
-So `bun run build` precompiles `src/**` into `dist/**` with the transform
-OpenCode would have applied (`babel-preset-solid`,
-`{ moduleName: "@opentui/solid", generate: "universal" }`), and
-`package.json#exports` points at `dist/`. The compiled entry imports
-`@opentui/solid` and `solid-js` by bare name, which OpenCode rewrites to its own
-runtime — the plugin shares the host's single Solid instance instead of
-installing a second one.
-
-`dist/` is committed on purpose: package installs do not run a build step.
-
-## Missing-directory behavior
-
-The TUI plugin asks the server, via the bundled `session-history.check` RPC, which session directories no longer exist. One batched call covers every distinct directory, and it runs on the server (`node:fs`), so it also works against a remote server and for sessions from every project. It **fails open**: only `ENOENT`/`ENOTDIR` count as missing, so protected paths (macOS `EPERM`) and transient errors never mark a live session.
-
-Rows whose directory is gone are dimmed and prefixed with a red `✗`. Activating one (click or Enter) warns first instead of opening: a 3-second, dismissible toast that never navigates. Activating the same row again within a few seconds opens it anyway — the CLI then handles the missing directory itself. The warning state resets on a timer and whenever the filter changes.
-
-This is deliberately **not** called "deleted": a missing directory and a deleted session are different states. Deleted sessions are removed from the server and never reach the list.
-
-> **Note:** When the TUI is connected to a remote OpenCode server, "missing" reflects the *server's* filesystem, not your local machine.
+- **No Sessions button.** Check `opencode plugin list` for `session-explorer`
+  with `features.gui: true`. A missing `gui` feature means the host did not load
+  `./gui-experimental`; a plugin error is also logged to
+  `~/.local/share/opencode/log/opencode.log`.
+- **"Connecting to the local server…" does not clear.** The dialog opened before
+  the host listed its servers. It refreshes automatically once a server appears;
+  otherwise use **Try again**.
+- **Shortcut does nothing.** Another command may own `Ctrl+Shift+H`; reassign it
+  in the host keybindings for the command id `session-explorer.open`.
+- **An archived session opened but stayed archived.** That is the host's direct
+  open path, and it preserves the archive. Use **Restore** in the row menu when
+  you want it back in the unarchived list.
+- **The dialog says the directory is missing.** The server reported that path as
+  gone. Open anyway keeps the session but leaves the directory alone.
+- **Manage the plugin in Desktop.** Settings → Extensions → Plugins shows the
+  loaded plugin; reload after changing the config.
 
 ## Development
 
 ```sh
-bun install
-bun run build
-bun run typecheck
-bun run tests/run.ts
-bun run audit
+npm install          # or: bun install
+npm run build        # Vite GUI bundle + the babel server/TUI build
+npm run typecheck    # tsc --noEmit
+npm test             # packaging/contract suite + pure explorer suite
+npm run dev          # rebuild the GUI bundle on change
 ```
 
-> **Packaging constraints** — all asserted by `bun run tests/run.ts`:
->
-> 1. `dist/` must be committed and up to date. The test rebuilds `src/` into a
->    temp directory and compares it byte for byte, so run `bun run build` after
->    touching anything in `src/`. Package installs never run a build.
-> 2. The build must not use `babel-plugin-module-resolver`. The compiled entry
->    has to import `@opentui/solid` and `solid-js` by bare name so OpenCode can
->    redirect them to its own runtime; baked-in `opentui:runtime-module:` ids
->    only resolve inside the host process.
-> 3. Keep the `/** @jsxImportSource @opentui/solid */` pragma at the top of
->    `src/tui.tsx`. That raw file is still loaded when the plugin is configured
->    by path from a checkout, where no `tsconfig.json` sits next to it; without
->    the pragma Bun compiles JSX against the `react` runtime
->    (`Cannot find package 'react'`).
-> 4. Keep `@opentui/core`, `@opentui/solid` and `solid-js` as **non-optional**
->    `peerDependencies`. They must be installed alongside the package or loading
->    fails with `Cannot find package '@opentui/solid'`.
+`npm run build` runs `vite build` (GUI → `dist/gui-experimental.cjs`) and then
+`scripts/build.ts` (server/TUI → `dist/*.js`, `.cjs` preserved). `dist/` is
+committed on purpose: package installs get no build step.
 
-## Layout
+### Why the entries are prebuilt
 
-```
-scripts/
-└── build.ts     # Compiles src/ → dist/ (babel-preset-solid, universal)
-src/
-├── rpc.ts       # SessionHistory RPC contract (check + settings)
-├── index.ts     # Server plugin: registers the check + settings RPCs
-├── directory.ts # Server-side directory existence check
-├── options.ts   # Pure config-option merge + defaults (unit-tested)
-├── sessions.ts  # Pure session list/filter helpers (unit-tested)
-└── tui.tsx      # CLI plugin: sidebar slot + filter + click + keymap
-tests/
-└── run.ts       # RPC contract + option/session helper + packaging tests
-dist/            # Committed build output; what package installs load
+OpenCode compiles plugin JSX through OpenTUI's Bun plugin, but that plugin skips
+anything under `node_modules`, which is where package installs land. Bun's own
+JSX transform then targets `@opentui/solid/jsx-runtime`, a static runtime: props
+become plain values, and a signal read happens once at mount, leaving the panel
+stale. `bun run build` therefore precompiles `src/**` with the transform OpenCode
+would have applied (`babel-preset-solid`, `moduleName: "@opentui/solid"`,
+`generate: "universal"`), and the compiled entry imports `@opentui/solid` and
+`solid-js` by bare name so the host rewrites them to its own runtime.
+
+The Desktop bundle is built with the official preset:
+
+```ts
+import { defineConfig } from "vite"
+import { gui } from "@opencode/plugin/gui/vite"
+
+export default defineConfig({ plugins: [gui()] })
 ```
 
-## Reporting bugs
+## Limitations
 
-- Bugs and feature requests: <https://github.com/ypxcs/opencode-session-history/issues>
-- Security issues: report privately, **not** in a public issue — see [SECURITY.md](./SECURITY.md).
+- Only the built-in local server was available while testing. The code keys
+  records by `(serverId, sessionId)` and isolates per-server errors, but a real
+  two-server setup, an incompatible server, a dropped event stream and a
+  disconnected server were not exercised in the app.
+- The Desktop dialog was checked in the host's dark theme and in a 1000×1000
+  window. Light theme and very small windows were not visually verified.
+- The TUI panel was validated by the upstream test suite and the type/build
+  checks; it was not driven interactively in a terminal during this round.
+- No npm publication. Do not publish without the owner's approval.
+
+## Upstream credit
+
+Forked from
+[`ypxcs/opencode-session-history`](https://github.com/ypxcs/opencode-session-history)
+at commit `2d61f0cd5205ef673fb547a3a5e7b454796c026b` (v0.1.5). The TUI panel,
+server entry, missing-directory RPC and their tests come from that project; the
+Desktop GUI entry is new here. Both are MIT licensed — see [LICENSE](LICENSE).
 
 ## License
 
-MIT.
+MIT. Copyright (c) the upstream authors and the Session Explorer contributors.

@@ -6,6 +6,7 @@
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 import {
   MAX_DIRECTORIES,
   SessionHistory,
@@ -24,7 +25,7 @@ import {
   truncateToWidth,
 } from "../src/sessions.js"
 import { resolveOptions } from "../src/options.js"
-import { build, defaultOutDir, TUI_ENTRY } from "../scripts/build.js"
+import { build, defaultOutDir, GUI_BUNDLE, TUI_ENTRY } from "../scripts/build.js"
 import type { Project, SessionInfo } from "@opencode/client"
 
 let failures = 0
@@ -43,7 +44,7 @@ const def = SessionHistory as unknown as {
   methods: Record<string, { input: unknown; output: unknown }>
 }
 const m = def.methods.check
-assert(def.id === "session-history", "rpc id is 'session-history'")
+assert(def.id === "session-explorer", "rpc id is 'session-explorer'")
 assert(typeof m === "object" && m !== null, "check method defined")
 assert(typeof m?.input === "object", "check has input schema")
 assert(typeof m?.output === "object", "check has output schema")
@@ -302,9 +303,12 @@ try {
   assert(emitted.includes("index.js"), "the build emits the server entry")
 
   const committed = await listFiles(defaultOutDir)
+  // dist/ also holds the Vite-built Desktop GUI bundle, which this script does
+  // not compile (it preserves it), so the expected set is emit + bundle.
+  const expected = [...emitted, GUI_BUNDLE].sort()
   assert(
-    committed.join(",") === emitted.join(","),
-    `dist/ holds exactly the built files (${committed.length} vs ${emitted.length})`,
+    committed.join(",") === expected.join(","),
+    `dist/ holds exactly the built files plus the GUI bundle (${committed.length} vs ${expected.length})`,
   )
   for (const file of emitted) {
     const [fresh, onDisk] = await Promise.all([
@@ -316,6 +320,57 @@ try {
 } finally {
   await rm(scratch, { recursive: true, force: true })
 }
+
+console.log("package.gui")
+// The Desktop half is prebuilt into one CommonJS file so consumers need no
+// build step, and it may only require modules the GUI host provides.
+const guiExport = manifest.exports?.["./gui-experimental"]
+assert(
+  guiExport === `./dist/${GUI_BUNDLE}`,
+  `exports["./gui-experimental"] points at the prebuilt bundle (${guiExport})`,
+)
+const bundle = await readFile(join(defaultOutDir, GUI_BUNDLE), "utf8")
+const required = [...new Set([...bundle.matchAll(/require\("([^"]+)"\)/g)].map((match) => match[1]!))].sort()
+const provided = new Set([
+  "@opencode/plugin/gui",
+  "@opencode/plugin/rpc",
+  "@opencode/plugin",
+  "@opencode/client",
+  "effect",
+  "solid-js",
+  "solid-js/web",
+])
+assert(required.length > 0, "the GUI bundle imports the host modules by name")
+assert(
+  required.every((name) => provided.has(name)),
+  `the GUI bundle requires only provided modules (${required.join(", ")})`,
+)
+assert(!/require\("\.\.?\//.test(bundle), "the GUI bundle is self-contained (no relative requires)")
+assert(
+  !/[^a-zA-Z]require\("(node:|fs|path|os)"/.test(bundle),
+  "the GUI bundle does not pull Node built-ins",
+)
+assert(
+  bundle.includes("TitlebarItem") && bundle.includes("Command") && bundle.includes("Store"),
+  "the GUI bundle registers the titlebar item, the command and its store",
+)
+
+// The committed bundle must match the sources it was built from: every message
+// key the GUI asks for has to exist in the package's own catalog. A stale
+// bundle would ship copy that no longer exists in `src/`.
+const guiSources = await listFiles(fileURLToPath(new URL("../src/gui", import.meta.url)))
+const guiText = (
+  await Promise.all(
+    guiSources.map((file) => readFile(fileURLToPath(new URL(`../src/gui/${file}`, import.meta.url)), "utf8")),
+  )
+).join("\n")
+const usedKeys = [...new Set([...guiText.matchAll(/ctx\.t\(\s*"([^"]+)"/g)].map((match) => match[1]!))].sort()
+assert(usedKeys.length > 0, `found ${usedKeys.length} message keys used by the GUI`)
+const missingKeys = usedKeys.filter((key) => !bundle.includes(`"${key}"`))
+assert(
+  missingKeys.length === 0,
+  `the committed GUI bundle contains every message key (missing: ${missingKeys.join(", ") || "none"}; rebuild with \`npm run build\`)`,
+)
 
 const compiledTui = await readFile(join(defaultOutDir, TUI_ENTRY), "utf8")
 assert(

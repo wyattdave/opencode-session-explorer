@@ -40,7 +40,7 @@ import { resolveOptions } from "./options.js";
  * cache on top. Project scope filters that combined list.
  */
 export default Plugin.define({
-  id: "session-history",
+  id: "session-explorer",
   setup(context) {
     const [serverOptions, setServerOptions] = createSignal({});
     // OpenCode delivers config options to the server half only. The server
@@ -247,7 +247,7 @@ function SidebarHistory(props) {
   createEffect(() => {
     const id = activeRow();
     if (!id) return;
-    scrollRef?.scrollChildIntoView(`session-history-${id}`);
+    scrollRef?.scrollChildIntoView(`session-explorer-${id}`);
   });
 
   // Full cross-project index from the server. The reactive store only holds
@@ -415,7 +415,7 @@ function SidebarHistory(props) {
     target: () => inputRef,
     priority: 1,
     commands: [{
-      id: "session-history.activate",
+      id: "session-explorer.activate",
       title: "Open highlighted session",
       bind: "return",
       enabled: () => {
@@ -432,7 +432,7 @@ function SidebarHistory(props) {
         activate(session.id, session.location.directory);
       }
     }, {
-      id: "session-history.move-down",
+      id: "session-explorer.move-down",
       title: "Move highlight down",
       bind: "down",
       run: () => {
@@ -444,7 +444,7 @@ function SidebarHistory(props) {
         if (row) setActiveRow(row.id);
       }
     }, {
-      id: "session-history.move-up",
+      id: "session-explorer.move-up",
       title: "Move highlight up",
       bind: "up",
       run: () => {
@@ -456,7 +456,7 @@ function SidebarHistory(props) {
         if (row) setActiveRow(row.id);
       }
     }, {
-      id: "session-history.filter.dismiss",
+      id: "session-explorer.filter.dismiss",
       title: "Clear session filter",
       bind: "escape",
       run: () => {
@@ -556,7 +556,7 @@ function SidebarHistory(props) {
                 }
               }), null);
               _$effect(_p$ => {
-                var _v$12 = `session-history-${s.id}`,
+                var _v$12 = `session-explorer-${s.id}`,
                   _v$13 = context.theme.border?.base,
                   _v$14 = isStale() ? context.theme.text.muted : isActive() ? context.theme.text.strong : context.theme.text.base,
                   _v$15 = props.truncateSessionTitles ? "none" : "word";

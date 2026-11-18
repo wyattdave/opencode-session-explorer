@@ -1,22 +1,24 @@
 {
-  "name": "opencode-session-history",
-  "version": "0.1.5",
-  "description": "OpenCode V2 CLI plugin: a sidebar session-history panel with click-to-resume.",
+  "name": "opencode-session-explorer-desktop",
+  "version": "0.2.0",
+  "description": "OpenCode V2 plugin: browse, search and reopen sessions across every project from a global Desktop dialog, plus the original TUI history panel.",
   "type": "module",
   "license": "MIT",
-  "author": "ypxcs",
+  "author": "ypxcs (upstream), Session Explorer contributors",
   "homepage": "https://github.com/ypxcs/opencode-session-history#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ypxcs/opencode-session-history.git"
   },
   "bugs": {
+    "type": "url",
     "url": "https://github.com/ypxcs/opencode-session-history/issues"
   },
   "files": [
     "dist",
     "src",
     "README.md",
+    "IMPLEMENTATION.md",
     "LICENSE",
     "SECURITY.md"
   ],
@@ -25,36 +27,45 @@
     "opencode-plugin",
     "plugin",
     "tui",
+    "desktop",
     "sessions",
-    "history"
+    "history",
+    "archive"
   ],
   "exports": {
     ".": "./dist/index.js",
-    "./tui": "./dist/tui.js"
+    "./tui": "./dist/tui.js",
+    "./gui-experimental": "./dist/gui-experimental.cjs"
   },
   "scripts": {
-    "build": "bun run scripts/build.ts",
+    "build": "vite build && bun run scripts/build.ts",
+    "dev": "vite build --watch",
     "typecheck": "tsc --noEmit",
-    "test": "bun run tests/run.ts",
+    "test": "bun run tests/run.ts && bun run tests/explorer.ts",
     "audit": "bun audit",
-    "prepublishOnly": "bun run build && bun run typecheck && bun run tests/run.ts"
+    "prepublishOnly": "npm run build && npm run typecheck && npm test"
   },
   "dependencies": {
-    "@opencode/plugin": "2.0.31"
+    "@opencode/plugin": "2.3.2"
   },
   "peerDependencies": {
-    "@opentui/core": "0.5.17",
-    "@opentui/solid": "0.5.17",
-    "solid-js": "1.9.12"
+    "@opentui/core": "0.9.3",
+    "@opentui/solid": "0.9.3",
+    "solid-js": "1.9.17"
   },
   "devDependencies": {
     "@babel/core": "7.29.7",
     "@babel/preset-typescript": "7.27.1",
-    "@opencode/client": "2.0.31",
-    "@opentui/solid": "^0.5.17",
-    "@types/node": "^26.6.5",
-    "babel-preset-solid": "1.9.12",
-    "solid-js": "^1.9.12",
-    "typescript": "^5.6.0"
+    "@opencode/client": "2.3.2",
+    "@opentui/core": "0.9.3",
+    "@opentui/solid": "0.9.3",
+    "@types/node": "24.10.0",
+    "babel-preset-solid": "1.9.19",
+    "bun": "1.4.4",
+    "effect": "4.1.0",
+    "solid-js": "1.9.17",
+    "typescript": "5.9.3",
+    "vite": "7.3.7",
+    "vite-plugin-solid": "2.11.10"
   }
 }

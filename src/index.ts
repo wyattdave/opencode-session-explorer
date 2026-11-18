@@ -20,7 +20,7 @@ import { missingDirectories } from "./directory.js"
  * caps the list and bounds concurrency.
  */
 export default Plugin.define({
-  id: "session-history",
+  id: "session-explorer",
   async setup(ctx) {
     await ctx.rpc.register(SessionHistory, {
       check: async (input): Promise<SessionHistoryCheckOutput> => {
