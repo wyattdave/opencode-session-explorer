@@ -7,7 +7,8 @@ entry point: a titlebar button and a command that open a searchable dialog over
 **every project and every archived session**, even from the home screen with no
 session open.
 
-Package: `opencode-session-explorer-desktop` · plugin id: `session-explorer`.
+Package: `opencode-session-explorer-desktop` · plugin id: `session-explorer` ·
+repository: [wyattdave/opencode-session-explorer](https://github.com/wyattdave/opencode-session-explorer).
 
 ## What this fork adds
 
@@ -45,9 +46,29 @@ defaults. `limit` only caps the TUI panel and never the Desktop list.
 Requires **OpenCode V2**. Desktop support was tested with OpenCode Desktop
 **2.3.2** on Windows 11 (see [Version support](#version-support)).
 
-The package is **not published to npm** yet. Install it from a checkout or from
-the packed tarball; `dist/` is committed and shipped, so consumers never run a
-build step.
+The package is published to npm as `opencode-session-explorer-desktop` and ships
+a prebuilt `dist/`, so consumers never run a build step.
+
+### From npm
+
+```sh
+opencode plugin add opencode-session-explorer-desktop
+```
+
+Or add it to `~/.config/opencode/opencode.jsonc`:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["opencode-session-explorer-desktop"]
+}
+```
+
+Restart OpenCode Desktop.
+
+### From a tarball or checkout
+
+Useful before a release or when testing local changes.
 
 ```sh
 # Somewhere outside the source tree, e.g. the plugins folder:
@@ -80,7 +101,7 @@ session-explorer  local    C:/Users/you/.config/opencode/plugins/opencode-sessio
 A checkout also works during development:
 
 ```jsonc
-{ "plugins": ["C:/GitHub/opencode-archive-manager"] }
+{ "plugins": ["C:/path/to/opencode-session-explorer"] }
 ```
 
 > Git URL installs (`github:...`) fail on some V2 builds before the download
@@ -267,6 +288,18 @@ import { gui } from "@opencode/plugin/gui/vite"
 export default defineConfig({ plugins: [gui()] })
 ```
 
+### Releasing
+
+```sh
+npm run typecheck
+npm test
+npm pack --dry-run   # inspect what the tarball will contain
+npm publish          # requires npm credentials and the owner's approval
+```
+
+`prepublishOnly` re-runs the build, the typecheck and the tests. Commit `dist/`
+before tagging: consumers never build.
+
 ## Limitations
 
 - Only the built-in local server was available while testing. The code keys
@@ -277,7 +310,8 @@ export default defineConfig({ plugins: [gui()] })
   window. Light theme and very small windows were not visually verified.
 - The TUI panel was validated by the upstream test suite and the type/build
   checks; it was not driven interactively in a terminal during this round.
-- No npm publication. Do not publish without the owner's approval.
+- Only the host versions listed above were tested; releases are cut by the
+  repository owner.
 
 ## Upstream credit
 

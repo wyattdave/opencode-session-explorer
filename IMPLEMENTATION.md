@@ -15,13 +15,14 @@ Target host: **OpenCode Desktop / opencode v2.3.2** on Windows 11.
 | Upstream commit | `2d61f0cd5205ef673fb547a3a5e7b454796c026b` (v0.1.5) |
 | Upstream license | MIT, retained (`LICENSE`, author/credits in `package.json`) |
 | Fork location | `C:\GitHub\opencode-archive-manager` |
-| Git remotes | `upstream` points at the original repository; nothing was pushed to it |
-| Working history | upstream commit `2d61f0c` is the first commit; the fork's changes sit on top as uncommitted/working-tree changes plus new files |
+| Fork repository | `https://github.com/wyattdave/opencode-session-explorer` (public) |
+| Git remotes | `origin` points at the fork; `upstream` points at the original repository, which was never pushed to |
+| Working history | upstream commit `2d61f0c` is the base; the fork's changes are local commits on `main` |
 
 The fork was created in place: `git init`, `git remote add upstream <url>`,
-`git fetch upstream`, `git checkout` of `upstream/main`, then edits. No separate
-GitHub fork was created (no remote creation was attempted), and no commits were
-pushed anywhere.
+`git fetch upstream`, `git checkout` of `upstream/main`, then edits committed on
+`main`. The public fork was published afterwards as `origin`; nothing was ever
+pushed to the upstream repository.
 
 Files kept from upstream: `src/index.ts` (server entry), `src/tui.tsx` (TUI
 panel), `src/rpc.ts`, `src/directory.ts`, `src/sessions.ts`, the precompiled

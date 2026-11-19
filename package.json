@@ -5,14 +5,14 @@
   "type": "module",
   "license": "MIT",
   "author": "ypxcs (upstream), Session Explorer contributors",
-  "homepage": "https://github.com/ypxcs/opencode-session-history#readme",
+  "homepage": "https://github.com/wyattdave/opencode-session-explorer#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ypxcs/opencode-session-history.git"
+    "url": "git+https://github.com/wyattdave/opencode-session-explorer.git"
   },
   "bugs": {
     "type": "url",
-    "url": "https://github.com/ypxcs/opencode-session-history/issues"
+    "url": "https://github.com/wyattdave/opencode-session-explorer/issues"
   },
   "files": [
     "dist",
