@@ -1,4 +1,7 @@
+# Normalize text checkouts so sources build the same everywhere.
+* text=auto eol=lf
+
 # Build output is byte-compared by tests/run.ts, so it must survive checkout
 # unchanged: core.autocrlf would otherwise rewrite dist/*.js to CRLF and make a
-# fresh build differ.
+# fresh build differ. Keep this rule last.
 dist/** -text

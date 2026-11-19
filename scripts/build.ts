@@ -92,7 +92,7 @@ export async function build(outDir: string = defaultOutDir): Promise<string[]> {
     if (JSX.test(file)) presets.push([presetSolid, { moduleName: "@opentui/solid", generate: "universal" }])
     if (SCRIPT.test(file)) presets.push([presetTypeScript])
 
-    const transformed = await transformAsync(await readFile(file, "utf8"), {
+    const transformed = await transformAsync((await readFile(file, "utf8")).replace(/\r\n?/g, "\n"), {
       filename: file,
       configFile: false,
       babelrc: false,
@@ -103,7 +103,11 @@ export async function build(outDir: string = defaultOutDir): Promise<string[]> {
 
     const target = join(outDir, relative(sourceDir, file).replace(SCRIPT, ".js"))
     await mkdir(dirname(target), { recursive: true })
-    await writeFile(target, code, "utf8")
+    // Babel keeps the line endings of the source it read, while `git` checks
+    // sources out with CRLF on Windows and LF elsewhere. Normalize both ends so
+    // the committed `dist/` is byte-identical after any checkout, which
+    // `tests/run.ts` enforces.
+    await writeFile(target, code.replace(/\r\n?/g, "\n"), "utf8")
     emitted.push(relative(outDir, target))
   }
   return emitted.sort()
